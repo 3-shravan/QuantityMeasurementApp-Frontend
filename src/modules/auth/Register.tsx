@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useMutation } from "@tanstack/react-query"
 import { authService } from "./authService"
+import { getGoogleAccessToken } from "./googleOAuth"
 import { useAuthStore } from "@/core/authStore"
 import { getApiErrorMessage } from "@/core/apiError"
 import { registerSchema, type RegisterFormData } from "@/core/validation"
@@ -28,6 +29,28 @@ export function Register() {
       setApiError(
         getApiErrorMessage(error, "Registration failed. Please try again.")
       )
+    },
+  })
+
+  const googleLoginMutation = useMutation({
+    mutationFn: async () => {
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as
+        | string
+        | undefined
+
+      if (!clientId) {
+        throw new Error("Google OAuth is not configured. Missing client ID.")
+      }
+
+      const accessToken = await getGoogleAccessToken(clientId)
+      return authService.googleLogin(accessToken)
+    },
+    onSuccess: (response) => {
+      setAuth(response)
+      navigate("/")
+    },
+    onError: (error: unknown) => {
+      setApiError(getApiErrorMessage(error, "Google sign up/login failed."))
     },
   })
 
@@ -144,10 +167,28 @@ export function Register() {
 
           <button
             type="submit"
-            disabled={registerMutation.isPending}
+            disabled={
+              registerMutation.isPending || googleLoginMutation.isPending
+            }
             className="relative flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90 focus:outline-none disabled:opacity-50"
           >
             {registerMutation.isPending ? "Creating account..." : "Sign up"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setApiError(null)
+              googleLoginMutation.mutate()
+            }}
+            disabled={
+              registerMutation.isPending || googleLoginMutation.isPending
+            }
+            className="relative flex h-10 w-full items-center justify-center rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
+          >
+            {googleLoginMutation.isPending
+              ? "Connecting to Google..."
+              : "Continue with Google"}
           </button>
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
